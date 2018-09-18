@@ -1,9 +1,15 @@
+import argparse
+import enum
 import os.path
+import re
 import sys
 import traceback
 
 import requests
+import semantic_version
 
+import installer
+from files import ReleaseFile
 from util import retry_multi, GLOBAL_TIMEOUT
 
 metadata = {
@@ -50,7 +56,7 @@ subdirs = {
 }
 
 
-def render_nebula_release(version, stability, files, config):
+def render_nebula_release(version, stability, files):
     meta = metadata.copy()
     meta['version'] = str(version)
     meta['stability'] = stability  # This can be one of ('stable', 'rc', 'nightly')
@@ -181,13 +187,13 @@ def nebula_request(session, kind, path, **kwargs):
     return session.request(kind, uri, **request_args)
 
 
-def submit_release(meta, config):
+def submit_release(meta, user, password):
     try:
         with requests.Session() as session:
             print('Logging into Nebula...')
             result = nebula_request(session, 'post', 'login', data={
-                'user': config['nebula']['user'],
-                'password': config['nebula']['password']
+                'user': user,
+                'password': password
             })
 
             if result.status_code != 200:
@@ -219,3 +225,82 @@ def submit_release(meta, config):
         exc_type, exc_value, exc_traceback = sys.exc_info()
         traceback.print_exception(exc_type, exc_value, exc_traceback)
         return False
+
+
+BUILD_GROUP_REGEX = re.compile(".*-builds-([^.-]*)(-([^.]*))?.*")
+TEST_NAME_REGEX = re.compile("test_(.*)-builds")
+
+
+class ReleaseType(enum.Enum):
+    RELEASE = enum.auto()
+    NIGHTLY = enum.auto()
+    TEST = enum.auto()
+
+
+def get_build_type(filename: str) -> ReleaseType:
+    if filename.startswith("test_"):
+        return ReleaseType.TEST
+    elif filename.startswith("nightly_"):
+        return ReleaseType.NIGHTLY
+    else:
+        return ReleaseType.RELEASE
+
+
+def get_build_version(type: ReleaseType, filename: str) -> semantic_version.Version:
+    if type is ReleaseType.RELEASE:
+        pass
+    elif type is ReleaseType.NIGHTLY:
+        pass
+    else:
+        assert type is ReleaseType.TEST
+        pass
+
+
+def submit_files(args):
+    user = os.environ["NEBULA_USER"]
+    password = os.environ["NEBULA_PASS"]
+
+    file = os.path.abspath(args.file)
+    name = os.path.basename(file)
+
+    release_type = get_build_type(name)
+
+    group_match = BUILD_GROUP_REGEX.match(name)
+
+    if group_match is None:
+        print("File '" + file + "' does not match build group regex!")
+        return
+
+    release_file = ReleaseFile(name, None, group_match.group(1), group_match.group(3))
+
+    with open(file, "rb") as f:
+        installer.generate_hash_list(release_file, file, f)
+
+    meta = render_nebula_release(1, "nightly", [release_file])
+
+    if release_type == ReleaseType.TEST:
+        # This is a test build so we need to change the title and id of the mod
+        test_match = TEST_NAME_REGEX.match(name)
+        if test_match is None:
+            print("File '" + file + "' does not match test name regex!")
+            return
+
+        test_name = test_match.group(1)
+
+        meta["title"] = "FSO-" + test_name
+        meta["id"] = "FSO-" + test_name
+
+    print(file)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Controls FSO build aspects of Nebula releases.")
+    subparsers = parser.add_subparsers()
+
+    submit_parser = subparsers.add_parser("submit", help="Submits a a release build to nebula")
+    submit_parser.add_argument("file", type=str, help="The package file containing the builds")
+    submit_parser.set_defaults(action=submit_files)
+
+    args = parser.parse_args()
+
+    args.action(args)

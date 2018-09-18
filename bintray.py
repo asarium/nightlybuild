@@ -44,6 +44,6 @@ def get_file_list(tag_name, config):
             "file_path": file["path"]
         })
 
-        out_data.append(ReleaseFile(file["name"], download_url, file["sha1"], group_match))
+        out_data.append(ReleaseFile(file["name"], download_url, group_match, file["sha1"]))
 
     return sorted(out_data, key=lambda x: x.group)

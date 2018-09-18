@@ -3,15 +3,11 @@
 import argparse
 import os
 import sys
-import time
-
-import datetime
 from itertools import groupby
 
-import yaml
 import semantic_version
+import yaml
 
-import bintray
 import github
 import installer
 import nebula
@@ -63,8 +59,8 @@ class ReleaseState(ScriptState):
         print(installer.render_installer_config(self.version, groups, self.config))
 
         nebula.submit_release(
-            nebula.render_nebula_release(self.version, "rc" if self.version.prerelease else "stable", files, config),
-            config)
+            nebula.render_nebula_release(self.version, "rc" if self.version.prerelease else "stable", files),
+            config['nebula']['user'], config['nebula']['password'])
 
         date = self.date.strftime(ScriptState.DATEFORMAT_FORUM)
 

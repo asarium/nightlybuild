@@ -2,11 +2,8 @@
 
 import argparse
 import os
-import sys
-
-import datetime
-
 import re
+import sys
 
 import semantic_version
 import yaml
@@ -72,7 +69,8 @@ class NightlyState(ScriptState):
             installer.get_file_list(file)
 
         version = get_source_version(self.config, self.date.strftime(ScriptState.DATEFORMAT_VERSION))
-        nebula.submit_release(nebula.render_nebula_release(version, "nightly", files, config), config)
+        nebula.submit_release(nebula.render_nebula_release(version, "nightly", files), config['nebula']['user'],
+                              config['nebula']['password'])
 
         commit = self.repo.get_commit()
         date = self.date.strftime(ScriptState.DATEFORMAT_FORUM)
