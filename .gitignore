@@ -1,6 +1,7 @@
 
 # Ignore the actual config file
-config.yml
+/config.yml
+/config.circleci.yml
 
 # Pycharm project files
 .idea

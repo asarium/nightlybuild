@@ -1,0 +1,96 @@
+# Python CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-python/ for more details
+#
+version: 2.1
+
+executors:
+  python-runner:
+    docker:
+      - image: circleci/python:3.6.1-browsers
+
+references:
+  restore_cache: &restore_cache
+    restore_cache:
+      keys:
+        - v1-dependencies-{{ checksum "requirements.txt" }}
+        # fallback to using the latest cache if no exact match is found
+        - v1-dependencies-
+  install_dependencies: &install_dependencies
+    run:
+      name: Install dependencies
+      command: |
+        python3 -m venv venv
+        . venv/bin/activate
+        pip install -r requirements.txt
+  save_cache: &save_cache
+    save_cache:
+      paths:
+        - ./venv
+      key: v1-dependencies-{{ checksum "requirements.txt" }}
+
+jobs:
+  build_test:
+    executor: python-runner
+    working_directory: ~/repo
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "df:4d:ae:a3:0e:09:d0:60:45:08:d0:8f:0b:17:cc:59"
+      - checkout
+      # Download and cache dependencies
+      - *restore_cache
+      - *install_dependencies
+      - *save_cache
+      - run:
+          name: Run tests
+          command: |
+            . venv/bin/activate
+            python -m unittest discover -s test
+      - store_artifacts:
+          path: test-reports
+          destination: test-reports
+
+  run-nightly-script:
+    executor: python-runner
+    working_directory: ~/repo
+    environment:
+      REPO_URL: git@github.com:asarium/fs2open.github.com.git
+      REPO_DIR: ~/fso-repo
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "df:4d:ae:a3:0e:09:d0:60:45:08:d0:8f:0b:17:cc:59"
+      - checkout
+      - run:
+          name: Setup Git author
+          command: |
+            git config --global user.email "SirKnightlySCP@gmail.com"
+            git config --global user.name "SirKnightly"
+      # Download and cache dependencies
+      - *restore_cache
+      - *install_dependencies
+      - *save_cache
+      - run:
+          name: Clone FSO repo
+          command: |
+            git clone --depth=100 $REPO_URL $REPO_DIR
+      - run:
+          name: Decrypt config file
+          command: |
+            openssl enc -aes-256-cbc -d -pass env:CONFIG_PASSWORD -md sha256 -in ~/repo/config.circleci.yml.enc -out ~/repo/config.circleci.yml
+      - run:
+          name: Running nightly script
+          command: |
+            source venv/bin/activate
+            python3 nightly.py --config=config.circleci.yml
+
+workflows:
+  version: 2
+#  build-test:
+#    jobs:
+#      - build_test
+  run-nightly-script:
+    jobs:
+      - run-nightly-script:
+          context: nightly_build_context

@@ -8,6 +8,7 @@ def monitor_builds(tag_name, options):
     used_monitors = [monitors.TravisMonitor(options, tag_name), monitors.AppveyorMonitor(options, tag_name)]
     interval = options["monitor"]["check_interval"]
 
+    print("Monitoring state of build for tag {}...".format(tag_name))
     monitor_list = used_monitors
     while True:
         next_check = datetime.datetime.now() + datetime.timedelta(0, interval)

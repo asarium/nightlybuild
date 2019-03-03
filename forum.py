@@ -2,7 +2,6 @@
 import time
 from itertools import groupby
 
-import os
 from mako.template import Template
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -54,10 +53,7 @@ class ForumAPI:
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')
 
-        if os.path.isfile("/tmp/ghostdriver.log"):
-            os.remove("/tmp/ghostdriver.log")
-
-        return webdriver.PhantomJS(executable_path=self.config["phantomjs"]["path"], service_log_path='/tmp/ghostdriver.log')
+        return webdriver.Chrome(chrome_options=options)
 
     def login(self, driver: WebDriver):
         driver.get("http://www.hard-light.net/forums/index.php?action=login")
